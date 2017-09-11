@@ -33,3 +33,6 @@ TO DO:
  * Color presets
  * Enable debug logging on app settings
  * Remove custom code when ST correctly parses both all color attributes and multiple reporting in one message
+ 
+ Please refer to the SmartThings community forum post about this Device Handler for any comments, bux fixes. etc:
+ https://community.smartthings.com/t/ikea-tradfri-rgb-bulbs-zigbee-with-cie-xy-color-scheme/98503
