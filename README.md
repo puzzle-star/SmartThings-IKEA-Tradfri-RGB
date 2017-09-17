@@ -24,15 +24,15 @@ This handler is written so that it reports any change in the bulb state (on/off,
 immediately to be processed by other apps.
 
 Author: Pedro Garcia
-Date: 2017-09-10
+Date: 2017-09-17
+Version: 1.1
 
 TO DO:
- * Named colors (coming next)
- * Color event must send string with hue and saturation values instead of hex
- * setColor(hue:saturation) setHue() setSaturation()
  * Color presets
  * Enable debug logging on app settings
  * Remove custom code when ST correctly parses both all color attributes and multiple reporting in one message
- 
- Please refer to the SmartThings community forum post about this Device Handler for any comments, bux fixes. etc:
+ * Color event should send string with hue and saturation values instead of hex, as per API reference, but when
+   doing so, the color picker does not get updated 
+
+Please refer to the SmartThings community forum post about this Device Handler for any comments, bux fixes. etc:
  https://community.smartthings.com/t/ikea-tradfri-rgb-bulbs-zigbee-with-cie-xy-color-scheme/98503
