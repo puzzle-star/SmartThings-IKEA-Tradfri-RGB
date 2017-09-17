@@ -1,54 +1,3 @@
-/**
- *  Copyright 2017 Pedro Garcia
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- *  in compliance with the License. You may obtain a copy of the License at:
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
- *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
- *  for the specific language governing permissions and limitations under the License.
- *
- *  IKEA Trådfri RGB Bulb
- *
- *  Color management is not trivial. IKEA bulbs are using CIE XY color scheme instead of Hue/Saturation. Also the 
- *  bulbs do not seem to be able to output "light cyan" color. Maybe it is my fault for not having being able to
- *  identify the correct color scheme (currently assuming sRGB with gamma correction), but cannot either with the 
- *  IKEA remote pairing...
- * 
- *  This handler is written so that it reports any change in the bulb state (on/off, brightness, color) as an event 
- *  immediately to be processed by other apps.
- *
- *  Author: Pedro Garcia
- *  Date: 2017-09-10
- *
- *  TO DO:
- *    - Named colors (coming next)
- *    - Color event must send string with hue and saturation values instead of hex
- *	  - setColor(hue:saturation) setHue() setSaturation()
- *    - Color presets
- *    - Enable debug logging on app settings
- *    - Remove custom code when ST correctly parses both all color attributes and multiple reporting in one message
- */
-
-import physicalgraph.zigbee.zcl.DataType
-
-metadata {
-  definition (name: "IKEA Tradfri RGB", namespace: "puzzle-star", author: "Pedro Garcia") {
-
-    // Hard Capabilities
-    capability "Light"
-    capability "Switch"
-    capability "Switch Level"
-    capability "Color Control"
-
-    // Soft Capabilities
-    capability "Actuator"
-    capability "Configuration"
-    capability "Refresh"
-    capability "Polling"
-    capability "Health Check"
 
 	// Capability Attributes
 	attribute "switch", "enum", ["on", "off"]
@@ -59,18 +8,21 @@ metadata {
 
 	// Custom Attributes
     attribute "colorName", "string"
+    attribute "red", "number"
+    attribute "green", "number"
+    attribute "blue", "number"
 
     // Custom Commands
     command "setColorName"
     command "setWhite"
     command "nextColor"
-	command "setLevelRed"
+	command "setRed"
     command "onRed"
     command "offRed"
-	command "setLevelGreen"
+	command "setGreen"
     command "onGreen"
     command "offGreen"
-	command "setLevelBlue"
+	command "setBlue"
     command "onBlue"
     command "offBlue"
 	
@@ -82,7 +34,6 @@ metadata {
     // input name: "debugEnabled", type: "bool", title: "Enable debug logging", defaultValue: false, displayDuringSetup: false, required: false
   }
 
-  // UI tile definitions
   tiles(scale: 2) {
     multiAttributeTile(name:"switch", type: "lighting", width: 6, height: 4, canChangeIcon: true){
       tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
@@ -101,49 +52,36 @@ metadata {
       }
     }
 
-    // Red Color Channel
-    standardTile("switchRed", "device.switchRed", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false) {
-      state "off", label:"R", action:"onRed", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8D8D8"
-      state "on", label:"R", action:"offRed", icon:"st.illuminance.illuminance.bright", backgroundColor:"#FF6060"
+	controlTile("colorWheel", "device.color", "color", height: 4, width: 3, inactiveLabel: false) {
+		state "color", label:"Color", action:"setColor"
+	}
+        
+    valueTile("hue", "device.hue", inactiveLabel: false, decoration: "flat") {
+        state "hue", label: 'Hue ${currentValue}%'
+    }
+    
+    valueTile("saturation", "device.saturation", inactiveLabel: false, decoration: "flat") {
+        state "saturation", label: 'Sat ${currentValue}%'
+    }
+    
+    valueTile("value", "device.level", inactiveLabel: false, decoration: "flat") {
+        state "level", label: 'Value ${currentValue}%'
+    }
+
+    standardTile("switchRed", "device.red", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false, decoration:'flat') {
+      state "on", label:'${currentValue}%', action:"offRed", icon:"st.illuminance.illuminance.bright", backgroundColor:"#FF6060"
+      state "0", label:'Red', action:"onRed", icon:"st.illuminance.illuminance.dark", backgroundColor:"#FFD8D8"
     }
  
-    controlTile("levelRedSlider", "device.levelRed", "slider", range:"(0..100)", height: 1, width: 4, inactiveLabel: false) {
-      state "levelRed", action:"setLevelRed"
+    standardTile("switchGreen", "device.green", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false, decoration:'flat') {
+      state "on", label:'${currentValue}%', action:"offGreen", icon:"st.illuminance.illuminance.bright", backgroundColor:"#60FF60"
+      state "0", label:"Green", action:"onGreen", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8FFD8"
     }
     
-    valueTile("levelRedTile", "device.levelRed", decoration: "flat", height: 1, width: 1) {
-      state "levelRed", label:'${currentValue}%'
+    standardTile("switchBlue", "device.blue", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false, decoration:'flat') {
+      state "on", label:'${currentValue}%', action:"offBlue", icon:"st.illuminance.illuminance.bright", backgroundColor:"#6060FF"
+      state "0", label:"Blue", action:"onBlue", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8D8FF"
     }
-
-    // Green Color Channel
-    standardTile("switchGreen", "device.switchGreen", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false) {
-      state "off", label:"G", action:"onGreen", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8D8D8"
-      state "on", label:"G", action:"offGreen", icon:"st.illuminance.illuminance.bright", backgroundColor:"#60FF60"
-    }
-    
-    controlTile("levelGreenSlider", "device.levelGreen", "slider", range:"(0..100)", height: 1, width: 4, inactiveLabel: false) {
-      state "levelGreen", action:"setLevelGreen"
-    }
-    
-    valueTile("levelGreenTile", "device.levelGreen", decoration: "flat", height: 1, width: 1) {
-      state "levelGreen", label:'${currentValue}%'
-    }
-
-    // Blue Color Channel
-    standardTile("switchBlue", "device.switchBlue", height: 1, width: 1, inactiveLabel: false, canChangeIcon: false) {
-      state "off", label:"B", action:"onBlue", icon:"st.illuminance.illuminance.dark", backgroundColor:"#D8D8D8"
-      state "on", label:"B", action:"offBlue", icon:"st.illuminance.illuminance.bright", backgroundColor:"#6060FF"
-    }
-    
-    controlTile("levelBlueSlider", "device.levelBlue", "slider", range:"(0..100)", height: 1, width: 4, inactiveLabel: false) {
-      state "levelBlue", action:"setLevelBlue"
-    }
-    
-    valueTile("levelBlueTile", "device.levelBlue", decoration: "flat", height: 1, width: 1) {
-      state "levelBlue", label:'${currentValue}%'
-    }
-
-    // Color Details
     
     valueTile("colorName", "device.colorName", inactiveLabel: false, decoration: "flat", width: 3, height: 1) {
       state "colorName", label: '${currentValue}'
@@ -188,11 +126,12 @@ metadata {
     
     main(["switch"])
     details([
-    	"switch", "colorTempSliderControl", 
-        "switchRed", "levelRedSlider", "levelRedTile",
-        "switchGreen", "levelGreenSlider", "levelGreenTile",
-        "switchBlue", "levelBlueSlider", "levelBlueTile",
-        "colorName", "refresh", "setWhite", "nextColor",
+    	"switch",
+        "colorWheel",
+        "hue", "saturation", "value",
+		"switchRed", "switchGreen", "switchBlue",
+        "refresh", "setWhite", "nextColor",
+        "colorName", 
     ])
   }
 }
@@ -373,25 +312,29 @@ def updateColor(rgb) {
   logTrace "updateColor: RGB ($rgb.red, $rgb.green, $rgb.blue)"
   def events = []
   
+  def hsv = colorRgb2Hsv(rgb.red, rgb.green, rgb.blue)
+  hsv.hue = Math.round(hsv.hue * 100).intValue()
+  hsv.saturation = Math.round(hsv.saturation * 100).intValue()
+  hsv.level = Math.round(hsv.level * 100).intValue()
+  logTrace "updateColor: RGB ($hsv.hue, $hsv.saturation, $hsv.level)"
+
   def colorMatch = getNearestMatch(rgb, false)
   logTrace "updateColor: $colorMatch"
 
   rgb.red = Math.round(rgb.red * 255).intValue()
   rgb.green = Math.round(rgb.green * 255).intValue()
   rgb.blue = Math.round(rgb.blue * 255).intValue()
-  
   logTrace "updateColor: RGB ($rgb.red, $rgb.green, $rgb.blue)"
   
   def color = colorUtil.rgbToHex(rgb.red, rgb.green, rgb.blue)
   logTrace "updateColor: $color"
   
-  events += createEvent(name: "color", value: color, data: rgb)
-  if(rgb.red) events += createEvent(name: "levelRed", value: Math.round(rgb.red * 100/255).intValue(), isStateChange: true)
-  if(rgb.green) events += createEvent(name: "levelGreen", value: Math.round(rgb.green * 100/255).intValue(), isStateChange: true)
-  if(rgb.blue) events += createEvent(name: "levelBlue", value: Math.round(rgb.blue * 100/255).intValue(), isStateChange: true)
-  events += createEvent(name: "switchRed", value: rgb.red ? "on" : "off")
-  events += createEvent(name: "switchGreen", value: rgb.green ? "on" : "off")
-  events += createEvent(name: "switchBlue", value: rgb.blue ? "on" : "off")
+  events += createEvent(name: "color", value: color, data: [ hue: hsv.hue, saturation: hsv.saturation, red: rgb.red, green: rgb.green, blue: rgb.blue, hex: color])
+  events += createEvent(name: "hue", value: hsv.hue)
+  events += createEvent(name: "saturation", value: hsv.saturation)
+  events += createEvent(name: "red", value: Math.round(rgb.red * 100/255).intValue())
+  events += createEvent(name: "green", value: Math.round(rgb.green * 100/255).intValue())
+  events += createEvent(name: "blue", value: Math.round(rgb.blue * 100/255).intValue())
   
   def colorName = colorMatch.name
   logTrace "colorCheck: $colorMatch.color - $color"
@@ -438,15 +381,33 @@ def setColor(red, green, blue) {
 
 def setColor(Map colorMap) {
 
-  logTrace "setColor: $colorMap"
+  logDebug "setColor: $colorMap"
+ 
+  def rgb
   
-  def red   = colorMap.red.intValue()
-  def green = colorMap.green.intValue()
-  def blue  = colorMap.blue.intValue()
-  
+  if(colorMap.containsKey("red") && colorMap.containsKey("green") && colorMap.containsKey("blue")) {
+    rgb = [ red : colorMap.red.intValue() / 255, green: colorMap.green.intValue() / 255, blue: colorMap.blue.intValue() / 255 ]
+  }
+  else if(colorMap.containsKey("hue") && colorMap.containsKey("saturation")) {
+  	rgb = colorHsv2Rgb(colorMap.hue / 100, colorMap.saturation / 100)
+  }
+  else {
+    log.warn "Unable to set color $colorMap"
+  }
+
   logTrace "setColor: RGB ($red, $green, $blue)"
   
-  setColor(red/255, green/255, blue/255)
+  setColor(rgb.red, rgb.green, rgb.blue)
+}
+
+def setHue(hue) {
+  logDebug "setHue: $hue"
+  setColor([ hue: hue, saturation: device.currentValue("saturation") ])
+}
+
+def setSaturation(saturation) {
+  logDebug "setSaturation: $saturation"
+  setColor([ hue: device.currentValue("hue"), saturation: saturation ])
 }
 
 def setColorName(name){
@@ -454,31 +415,19 @@ def setColorName(name){
   sendEvent(name: "colorName", value: name)
 }
 
-def getCurrentRGB() {
-  def hex = device.currentValue("color")
-  logTrace "Current HEX: $hex"
-  def rgb = colorUtil.hexToRgb(hex)
-  logTrace "Current RGB: $rgb"
-  
-  [ red: rgb[0]/255, green: rgb[1]/255, blue: rgb[2]/255 ]
+def setRed(level) {
+  def rgb = getCurrentRGB()
+  setColor(level/100, rgb.green, rgb.blue)
 }
 
-def setLevelRed(level) {
+def setGreen(level) {
   def rgb = getCurrentRGB()
-  rgb.red = level/100
-  setColor(rgb.red, rgb.green, rgb.blue)
+  setColor(rgb.red, level/100, rgb.blue)
 }
 
-def setLevelGreen(level) {
+def setBlue(level) {
   def rgb = getCurrentRGB()
-  rgb.green = level/100
-  setColor(rgb.red, rgb.green, rgb.blue)
-}
-
-def setLevelBlue(level) {
-  def rgb = getCurrentRGB()
-  rgb.blue = level/100
-  setColor(rgb.red, rgb.green, rgb.blue)
+  setColor(rgb.red, rgb.green, level/100)
 }
 
 def onRed() {
@@ -488,13 +437,11 @@ def onRed() {
 
 def onGreen() {
   def rgb = getCurrentRGB()
-  rgb.green = (rgb.red + rgb.blue) / 2
   if(state.lastGreen) setColor(rgb.red, state.lastGreen, rgb.blue)
 }
 
 def onBlue() {
   def rgb = getCurrentRGB()
-  rgb.blue = (rgb.red + rgb.green) / 2
   if(state.lastBlue) setColor(rgb.red, rgb.green, state.lastBlue)
 }
 
@@ -517,6 +464,13 @@ def offBlue() {
   if(!rgb.red && !rgb.green) return;
   state.lastBlue = rgb.blue;
   setColor(rgb.red, rgb.green, 0)
+}
+
+def getCurrentRGB() {
+  def rgb = [ red: device.currentValue("red")/100, green: device.currentValue("green")/100, blue: device.currentValue("blue")/100 ]
+  logDebug "Current RGB: $rgb"
+  
+  rgb
 }
 
 def getNearestMatch(rgb, wheelOnly) {
@@ -620,6 +574,15 @@ def installed() {
 
 // Color Management functions
 
+def min(first, ... rest) {
+  def min = first;
+  for(next in rest) {
+    if(next < min) min = next
+  }
+  
+  min
+}
+
 def max(first, ... rest) {
   def max = first;
   for(next in rest) {
@@ -699,4 +662,92 @@ def colorRgb2Xy(r, g, b) {
   logTrace "> Color xy: ($x, $y)"
 
   [x: x, y: y]
+}
+
+def colorHsv2Rgb(h, s) {
+	logTrace "< Color HSV: ($h, $s, 1)"
+    
+	def r
+    def g
+    def b
+    
+    if (s == 0) {
+        r = 1
+        g = 1
+        b = 1
+    }
+    else {
+        def region = (6 * h).intValue()
+        def remainder = 6 * h - region
+
+        def p = 1 - s
+        def q = 1 - s * remainder
+        def t = 1 - s * (1 - remainder)
+
+		if(region == 0) {
+            r = 1
+            g = t
+            b = p
+        }
+        else if(region == 1) {
+            r = q
+            g = 1
+            b = p
+        }
+        else if(region == 2) {
+            r = p
+            g = 1
+            b = t
+        }
+        else if(region == 3) {
+            r = p
+            g = q
+            b = 1
+        }
+        else if(region == 4) {
+            r = t
+            g = p
+            b = 1
+        }
+        else {
+            r = 1
+            g = p
+            b = q
+        }
+	}
+    
+	logTrace "< Color RGB: ($r, $g, $b)"
+  
+	[red: r, green: g, blue: b]
+}
+
+def colorRgb2Hsv(r, g, b)
+{
+	logTrace "> Color RGB: ($r, $g, $b)"
+  
+	def min = min(r, g, b)
+	def max = max(r, g, b)
+	def delta = max - min
+    
+    def h
+    def s
+    def v = max
+
+    if (delta == 0) {
+    	h = 0
+        s = 0
+    }
+    else {
+		s = delta / max
+        if (r == max) h = ( g - b ) / delta			// between yellow & magenta
+		else if(g == max) h = 2 + ( b - r ) / delta	// between cyan & yellow
+		else h = 4 + ( r - g ) / delta				// between magenta & cyan
+        h /= 6
+
+		if(h < 0) h += 1
+    }
+
+    logTrace "> Color HSV: ($h, $s, $v)"
+    
+    return [ hue: h, saturation: s, level: v ]
 }
